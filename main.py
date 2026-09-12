@@ -1,6 +1,8 @@
 import os
+import platform
 import shutil
 import streamlit as st
+
 ext = {
     "jpg": "image",
     "png": "image",
@@ -23,52 +25,57 @@ ext = {
     "md": "text",
     "rar": "archive"
 }
-#1. Build the user interface
+
+# 1. Detect OS and set appropriate default path hints
+current_os = platform.system()
+
+if current_os == "Windows":
+    example_path = r"C:\Users\YourName\Downloads"
+elif current_os == "Darwin":  
+    example_path = "/Users/YourName/Downloads"
+else:  
+    example_path = "/home/yourname/downloads"
+
+# Build UI
 st.title("Personal File Organizer")
-st.write("Clean up ur messy files and folders with ease!")
-# creating a text box for the user to input the path of the folder they want to organize
-folder_path= st.text_input("Enter the  full path of the folder you want to organize:")
-# Creating a button to trigger the organization process
+st.caption(f"🖥️ Detected System: **{current_os}**")
+st.write("Clean up your messy files and folders with ease!")
+
+raw_folder_path = st.text_input(
+    "Enter the full path of the folder you want to organize:",
+    placeholder=example_path
+)
+
 if st.button("Organize my files"):
-    # checks whether the files actually exists
-    if os.path.exists(folder_path) and os.path.isdir(folder_path):
-        
+    # 2. Normalize paths and expand home directory shortcuts (~/Downloads)
+    folder_path = os.path.normpath(os.path.expanduser(raw_folder_path.strip()))
+    
+    if raw_folder_path and os.path.exists(folder_path) and os.path.isdir(folder_path):
         files_moved = 0
         
-        # 3. Loop through everything in the folder using os.listdir
         for filename in os.listdir(folder_path):
             file_path = os.path.join(folder_path, filename)
             
-            # Make sure we are only moving files, not folders that are already there
+            # Ensure we only move files, skipping existing category subdirectories
             if os.path.isfile(file_path):
-                
-                # Get the extension (e.g., '.jpg') and remove the dot so it matches your dictionary
-                file_extension = os.path.splitext(filename)[1].lower().replace(".", "")
-                
-                # Look up the category in your 'ext' dictionary. 
-                # If it's a weird file type not in the list, default to "others"
+                file_extension = os.path.splitext(filename)[1].lower().lstrip(".")
                 category_name = ext.get(file_extension, "others")
                 
-                # 4. Create the new folder path (e.g., /documents/image)
+                # Construct target path using OS-specific separator
                 target_folder = os.path.join(folder_path, category_name)
+                os.makedirs(target_folder, exist_ok=True)
                 
-                # If the 'image' folder doesn't exist yet, make it!
-                if not os.path.exists(target_folder):
-                    os.makedirs(target_folder)
-                
-                # 5. Move the file
                 destination = os.path.join(target_folder, filename)
                 shutil.move(file_path, destination)
                 files_moved += 1
                 
-        # 6. Give the user some feedback on the screen
         if files_moved > 0:
-            st.success(f"🎉 Your files have been successfully organized {files_moved} files.")
-            st.balloons() # Streamlit's fun celebration animation!
+            st.success(f"🎉 Successfully organized {files_moved} files into category folders.")
+            st.balloons()
         else:
             st.info("No files were moved. The folder might already be organized!")
             
-    elif folder_path == "":
+    elif not raw_folder_path:
         st.warning("Please enter a folder path first.")
     else:
-        st.error("Oops! I can't find that folder. Double-check the path and try again.")
+        st.error(f"Oops! The path '{folder_path}' was not found on this system.")
